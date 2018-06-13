@@ -7,6 +7,7 @@ Helpers for embarrassingly parallel code.
 
 from __future__ import division
 
+import logging
 import os
 import sys
 from math import sqrt
@@ -21,7 +22,7 @@ import warnings
 from ._multiprocessing_helpers import mp
 
 from .format_stack import format_outer_frames
-from .logger import Logger, short_format_time
+from .logger import short_format_time
 from .my_exceptions import TransportableException, _mk_exception
 from .disk import memstr_to_bytes
 from ._parallel_backends import (FallbackToBackend, MultiprocessingBackend,
@@ -54,6 +55,8 @@ _backend = threading.local()
 
 VALID_BACKEND_HINTS = ('processes', 'threads', None)
 VALID_BACKEND_CONSTRAINTS = ('sharedmem', None)
+
+logger = logging.getLogger(__name__)
 
 
 def _register_dask():
@@ -376,8 +379,8 @@ def effective_n_jobs(n_jobs=-1):
 
 
 ###############################################################################
-class Parallel(Logger):
-    ''' Helper class for readable parallel mapping.
+class Parallel(object):
+    """ Helper class for readable parallel mapping.
 
         Read more in the :ref:`User Guide <parallel>`.
 
@@ -597,7 +600,7 @@ class Parallel(Logger):
         [Parallel(n_jobs=2)]: Done 6 out of 6 | elapsed:  0.0s remaining: 0.0s
         [Parallel(n_jobs=2)]: Done 6 out of 6 | elapsed:  0.0s finished
 
-    '''
+    """
     def __init__(self, n_jobs=None, backend=None, verbose=0, timeout=None,
                  pre_dispatch='2 * n_jobs', batch_size='auto',
                  temp_folder=None, max_nbytes='1M', mmap_mode='r',
