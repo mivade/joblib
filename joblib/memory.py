@@ -10,12 +10,12 @@ is called with the same input arguments.
 
 
 from __future__ import with_statement
+import logging
 import os
 import time
 import pydoc
 import re
 import functools
-import traceback
 import warnings
 import inspect
 import weakref
@@ -26,7 +26,7 @@ from .func_inspect import get_func_code, get_func_name, filter_args
 from .func_inspect import format_call
 from .func_inspect import format_signature
 from ._memory_helpers import open_py_source
-from .logger import Logger, format_time, pformat
+from .logger import format_time, pformat
 from ._compat import _basestring, PY3_OR_LATER
 from ._store_backends import StoreBackendBase, FileSystemStoreBackend
 
@@ -42,8 +42,7 @@ FIRST_LINE_TEXT = "# first line:"
 # store (or do we want to copy it to avoid cross-talks?), for instance to
 # implement HDF5 pickling.
 
-# TODO: Same remark for the logger, and probably use the Python logging
-# mechanism.
+logger = logging.getLogger(__name__)
 
 
 def extract_first_line(func_code):
@@ -174,7 +173,7 @@ _FUNCTION_HASHES = weakref.WeakKeyDictionary()
 ###############################################################################
 # class `MemorizedResult`
 ###############################################################################
-class MemorizedResult(Logger):
+class MemorizedResult(object):
     """Object representing a cached value.
 
     Attributes
@@ -206,7 +205,6 @@ class MemorizedResult(Logger):
     """
     def __init__(self, location, func, args_id, backend='local',
                  mmap_mode=None, verbose=0, timestamp=None, metadata=None):
-        Logger.__init__(self)
         self.func = func
         self.func_id = _build_func_identifier(func)
         self.args_id = args_id
@@ -330,7 +328,7 @@ class NotMemorizedFunc(object):
 ###############################################################################
 # class `MemorizedFunc`
 ###############################################################################
-class MemorizedFunc(Logger):
+class MemorizedFunc(object):
     """Callable object decorating a function for caching its return value
     each time it is called.
 
@@ -374,7 +372,6 @@ class MemorizedFunc(Logger):
 
     def __init__(self, func, location, backend='local', ignore=None,
                  mmap_mode=None, compress=False, verbose=1, timestamp=None):
-        Logger.__init__(self)
         self.mmap_mode = mmap_mode
         self.compress = compress
         self.func = func
@@ -437,13 +434,14 @@ class MemorizedFunc(Logger):
         # FIXME: The statements below should be try/excepted
         if not (self._check_previous_func_code(stacklevel=4) and
                 self.store_backend.contains_item([func_id, args_id])):
-            if self._verbose > 10:
-                _, name = get_func_name(self.func)
-                self.warn('Computing func {0}, argument hash {1} '
-                          'in location {2}'
-                          .format(name, args_id,
-                                  self.store_backend.
-                                  get_cached_func_info([func_id])['location']))
+
+            _, name = get_func_name(self.func)
+            logger.warning(
+                'Computing func %s, argument hash %r in location %s', name,
+                args_id, self.store_backend.get_cached_func_info(
+                    [func_id])['location']
+            )
+
             out, metadata = self.call(*args, **kwargs)
             if self.mmap_mode is not None:
                 # Memmap the output at the first call to be consistent with
@@ -469,10 +467,9 @@ class MemorizedFunc(Logger):
                     msg = '%s cache loaded - %s' % (name, format_time(t))
                     print(max(0, (80 - len(msg))) * '_' + msg)
             except Exception:
-                # XXX: Should use an exception logger
                 _, signature = format_signature(self.func, *args, **kwargs)
-                self.warn('Exception while loading results for '
-                          '{}\n {}'.format(signature, traceback.format_exc()))
+                logger.exception('Exception while loading results for %s',
+                                 signature, exc_info=True)
 
                 out, metadata = self.call(*args, **kwargs)
                 args_id = None
@@ -640,19 +637,17 @@ class MemorizedFunc(Logger):
 
         # The function has changed, wipe the cache directory.
         # XXX: Should be using warnings, and giving stacklevel
-        if self._verbose > 10:
-            _, func_name = get_func_name(self.func, resolv_alias=False)
-            self.warn("Function {0} (identified by {1}) has changed"
-                      ".".format(func_name, func_id))
-        self.clear(warn=True)
+        _, func_name = get_func_name(self.func, resolv_alias=False)
+        logger.warning("Function %s (identified by %s) has changed", func_name,
+                       func_id)
+        self.clear()
         return False
 
-    def clear(self, warn=True):
+    def clear(self):
         """Empty the function's cache."""
         func_id = _build_func_identifier(self.func)
 
-        if self._verbose > 0 and warn:
-            self.warn("Clearing function cache identified by %s" % func_id)
+        logger.warning("Clearing function cache identified by %s", func_id)
         self.store_backend.clear_path([func_id, ])
 
         func_code, _, first_line = get_func_code(self.func)
@@ -744,7 +739,7 @@ class MemorizedFunc(Logger):
 ###############################################################################
 # class `Memory`
 ###############################################################################
-class Memory(Logger):
+class Memory(object):
     """ A context object for caching a function's return value each time it
         is called with the same input arguments.
 
@@ -803,7 +798,6 @@ class Memory(Logger):
                  mmap_mode=None, compress=False, verbose=1, bytes_limit=None,
                  backend_options={}):
         # XXX: Bad explanation of the None value of cachedir
-        Logger.__init__(self)
         self._verbose = verbose
         self.mmap_mode = mmap_mode
         self.timestamp = time.time()
@@ -892,11 +886,10 @@ class Memory(Logger):
                              ignore=ignore, verbose=verbose,
                              timestamp=self.timestamp)
 
-    def clear(self, warn=True):
+    def clear(self):
         """ Erase the complete cache directory.
         """
-        if warn:
-            self.warn('Flushing completely the cache')
+        logger.warning('Flushing completely the cache')
         if self.store_backend is not None:
             self.store_backend.clear()
 
