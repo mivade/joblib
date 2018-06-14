@@ -93,7 +93,7 @@ def test_memory_integration(tmpdir):
             shutil.rmtree(tmpdir.strpath, ignore_errors=True)
             g = memory.cache(f)
             g(1)
-            g.clear(warn=False)
+            g.clear()
             current_accumulator = len(accumulator)
             out = g(1)
 
