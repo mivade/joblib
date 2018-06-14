@@ -5,6 +5,7 @@ Reducer using memory mapping for numpy arrays
 # Copyright: 2017, Thomas Moreau
 # License: BSD 3 clause
 
+import logging
 from mmap import mmap
 import errno
 import os
@@ -56,6 +57,8 @@ SYSTEM_SHARED_MEM_FS_MIN_SIZE = int(2e9)
 # temporary files and folder.
 FOLDER_PERMISSIONS = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
 FILE_PERMISSIONS = stat.S_IRUSR | stat.S_IWUSR
+
+logger = logging.getLogger(__name__)
 
 
 class _WeakArrayKeyMap:
@@ -333,9 +336,8 @@ class ArrayMemmapReducer(object):
             # possible to delete temporary files as soon as the workers are
             # done processing this data.
             if not os.path.exists(filename):
-                if self.verbose > 0:
-                    print("Memmapping (shape={}, dtype={}) to new file {}"
-                          .format(a.shape, a.dtype, filename))
+                logger.info("Memmapping (shape=%r, dtype=%r) to new file %s",
+                            a.shape, a.dtype, filename)
                 for dumped_filename in dump(a, filename):
                     os.chmod(dumped_filename, FILE_PERMISSIONS)
 
@@ -346,18 +348,16 @@ class ArrayMemmapReducer(object):
                     # concurrent memmap creation in multiple children
                     # processes.
                     load(filename, mmap_mode=self._mmap_mode).max()
-            elif self.verbose > 1:
-                print("Memmapping (shape={}, dtype={}) to old file {}"
-                      .format(a.shape, a.dtype, filename))
+            logger.info("Memmapping (shape=%r, dtype=%r) to old file %s",
+                        a.shape, a.dtype, filename)
 
             # The worker process will use joblib.load to memmap the data
             return (load, (filename, self._mmap_mode))
         else:
             # do not convert a into memmap, let pickler do its usual copy with
             # the default system pickler
-            if self.verbose > 1:
-                print("Pickling array (shape={}, dtype={})."
-                      .format(a.shape, a.dtype))
+            logger.info("Pickling array (shape=%r, dtype=%r).",
+                        a.shape, a.dtype)
             return (loads, (dumps(a, protocol=HIGHEST_PROTOCOL),))
 
 
