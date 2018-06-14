@@ -98,11 +98,12 @@ def get_active_backend(prefer=None, require=None, verbose=0):
             # This backend does not match the shared memory constraint:
             # fallback to the default thead-based backend.
             sharedmem_backend = BACKENDS[DEFAULT_THREAD_BACKEND]()
-            if verbose >= 10:
-                print("Using %s as joblib.Parallel backend instead of %s "
-                      "as the latter does not provide shared memory semantics."
-                      % (sharedmem_backend.__class__.__name__,
-                         backend.__class__.__name__))
+            logger.info(
+                "Using %s as joblib.Parallel backend instead of %s "
+                "as the latter does not provide shared memory semantics.",
+                sharedmem_backend.__class__.__name__,
+                backend.__class__.__name__
+            )
             return sharedmem_backend, DEFAULT_N_JOBS
         else:
             return backend_and_jobs
@@ -804,11 +805,9 @@ class Parallel(object):
         # completed jobs. Otherwise, we simply display the number of completed
         # tasks.
         if self._original_iterator is not None:
-            if _verbosity_filter(self.n_dispatched_batches, self.verbose):
-                return
-            self._print('Done %3i tasks      | elapsed: %s',
-                        (self.n_completed_tasks,
-                         short_format_time(elapsed_time), ))
+            logger.info('Done %3i tasks      | elapsed: %s',
+                        self.n_completed_tasks,
+                        short_format_time(elapsed_time),)
         else:
             index = self.n_completed_tasks
             # We are finished dispatching
@@ -826,12 +825,12 @@ class Parallel(object):
             remaining_time = (elapsed_time / index) * \
                              (self.n_dispatched_tasks - index * 1.0)
             # only display status if remaining time is greater or equal to 0
-            self._print('Done %3i out of %3i | elapsed: %s remaining: %s',
-                        (index,
-                         total_tasks,
-                         short_format_time(elapsed_time),
-                         short_format_time(remaining_time),
-                         ))
+            logger.info('Done %3i out of %3i | elapsed: %s remaining: %s',
+                        index,
+                        total_tasks,
+                        short_format_time(elapsed_time),
+                        short_format_time(remaining_time),
+                        )
 
     def retrieve(self):
         self._output = list()
@@ -902,8 +901,8 @@ Sub-process traceback:
             n_jobs = self._initialize_backend()
         else:
             n_jobs = self._effective_n_jobs()
-        self._print("Using backend %s with %d concurrent workers.",
-                    (self._backend.__class__.__name__, n_jobs))
+        logger.info("Using backend %s with %d concurrent workers.",
+                    self._backend.__class__.__name__, n_jobs)
         if hasattr(self._backend, 'start_call'):
             self._backend.start_call()
         iterator = iter(iterable)
@@ -958,9 +957,9 @@ Sub-process traceback:
                 self.retrieve()
             # Make sure that we get a last message telling us we are done
             elapsed_time = time.time() - self._start_time
-            self._print('Done %3i out of %3i | elapsed: %s finished',
-                        (len(self._output), len(self._output),
-                         short_format_time(elapsed_time)))
+            logger.info('Done %3i out of %3i | elapsed: %s finished',
+                        len(self._output), len(self._output),
+                        short_format_time(elapsed_time))
         finally:
             if hasattr(self._backend, 'stop_call'):
                 self._backend.stop_call()
