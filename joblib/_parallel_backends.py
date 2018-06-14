@@ -10,6 +10,7 @@ import threading
 import functools
 import contextlib
 from abc import ABCMeta, abstractmethod
+import logging
 
 from .format_stack import format_exc
 from .my_exceptions import WorkerInterrupt, TransportableException
@@ -25,6 +26,8 @@ if mp is not None:
     from multiprocessing import TimeoutError
     from .externals.loky._base import TimeoutError as LokyTimeoutError
     from .externals.loky import process_executor, cpu_count
+
+logger = logging.getLogger(__name__)
 
 
 class ParallelBackendBase(with_metaclass(ABCMeta)):
@@ -237,10 +240,8 @@ class AutoBatchingMixin(object):
             # Multiply by two to limit oscilations between min and max.
             batch_size = max(2 * ideal_batch_size, 1)
             self._effective_batch_size = batch_size
-            if self.parallel.verbose >= 10:
-                self.parallel._print(
-                    "Batch computation too fast (%.4fs.) "
-                    "Setting batch_size=%d.", (batch_duration, batch_size))
+            logger.warning("Batch computation too fast (%.4fs.) "
+                           "Setting batch_size=%d.", batch_duration, batch_size)
         elif (batch_duration > self.MAX_IDEAL_BATCH_DURATION and
               old_batch_size >= 2):
             # The current batch size is too big. If we schedule overly long
@@ -250,10 +251,8 @@ class AutoBatchingMixin(object):
             # likelihood of scheduling such stragglers.
             batch_size = old_batch_size // 2
             self._effective_batch_size = batch_size
-            if self.parallel.verbose >= 10:
-                self.parallel._print(
-                    "Batch computation too slow (%.4fs.) "
-                    "Setting batch_size=%d.", (batch_duration, batch_size))
+            logger.warning("Batch computation too slow (%.4fs.) "
+                           "Setting batch_size=%d.", batch_duration, batch_size)
         else:
             # No batch size adjustment
             batch_size = old_batch_size
