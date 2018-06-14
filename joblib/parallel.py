@@ -778,19 +778,6 @@ class Parallel(object):
                 self._dispatch(tasks)
                 return True
 
-    def _print(self, msg, msg_args):
-        """Display the message on stout or stderr depending on verbosity"""
-        # XXX: Not using the logger framework: need to
-        # learn to use logger better.
-        if not self.verbose:
-            return
-        if self.verbose < 50:
-            writer = sys.stderr.write
-        else:
-            writer = sys.stdout.write
-        msg = msg % msg_args
-        writer('[%s]: %s\n' % (self, msg))
-
     def print_progress(self):
         """Display the process of the parallel execution only a fraction
            of time, controlled by self.verbose.
